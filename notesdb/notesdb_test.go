@@ -1,5 +1,7 @@
 package notesdb
 
+// TODO: defer deleteNotes() on all these tests.
+
 import (
 	"testing"
 	"log"
