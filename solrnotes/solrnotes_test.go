@@ -68,6 +68,43 @@ func TestFindDocsNearby(t *testing.T) {
 	}
 }
 
+func TestFindDocsIgnoresDeleted(t *testing.T) {
+	conn, err := solr.Init("localhost", 8983, "geonotes")
+	if err != nil {
+		t.Fatal("Failed to connect to solr. Err: %v", err)
+	}
+	
+	sender := uuid.NewV4()
+	recipient := uuid.NewV4()
+	nearby1 := getTestDocAtLocation(sender, recipient, 40.810260, -73.94694)
+	nearby1.deleted = true
+	nearby2 := getTestDocAtLocation(sender, recipient, 40.808612, -73.944443)
+	farAway1 := getTestDocAtLocation(sender, recipient, 40.758320, -73.988327)
+	docs := []Document{nearby1, nearby2, farAway1}
+	for _, doc := range docs {
+		err := AddDoc(conn, doc)
+		if err != nil {
+			t.Fatal("Failed to add doc. Err: %v", err)
+		}
+	}
+
+	defer DeleteDocs(conn, []uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
+
+	searchLat := 40.809322
+	searchLon := -73.944587
+	searchRadiusKm := .5
+	maxRows := 10
+	results, err := FindDocsNearby(conn, recipient, searchLat, searchLon, searchRadiusKm, maxRows)
+	if err != nil {
+		t.Fatal("Error from FindDocsNearby: ", err)
+	}
+	
+	expectedResults := []*Document{&nearby2}
+	if !allDocsEqual(expectedResults, results) {
+		t.Fatal("Results are not what we expected.")
+	}
+}
+
 func getTestDoc(sender uuid.UUID, recipient uuid.UUID) Document {
 	lat := 42.4
 	lon := 69.9

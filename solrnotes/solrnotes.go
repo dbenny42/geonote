@@ -225,7 +225,6 @@ func formatGeofilter(lat float64, lon float64, radiusKm float64) string {
 	radiusStr := formatCoordinateFloat(radiusKm)
 	geofilter := 
 		"{!geofilt sfield=" + LOCATION + " pt=" + latStr + "," + lonStr + " d=" + radiusStr + "}"
-	log.Print("The geofilter is: ", geofilter)
 	return geofilter
 }
 
