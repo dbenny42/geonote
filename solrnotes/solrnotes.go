@@ -148,21 +148,6 @@ func DeleteDocs(conn *solr.Connection, ids []uuid.UUID) error {
 	return nil
 }
 
-func DeleteAll(conn *solr.Connection) error {
-	update := map[string]interface{}{
-		"delete" : "*",
-	}
-	
-	commit := true
-	_, err := conn.Update(update, commit)
-	if err != nil {
-		log.Print("Failed to delete docs.")
-		return err
-	}
-
-	return nil
-}
-
 func docsFromResults(results *solr.DocumentCollection) []*Document {
 	var err error
 	docs := make([]Document, results.Len())
