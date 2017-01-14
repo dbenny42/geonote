@@ -98,19 +98,20 @@ func GetDoc(conn *solr.Connection, id uuid.UUID) (*Document, error) {
 }
 
 func DeleteDocs(conn *solr.Connection, ids []uuid.UUID) error {
-	count := len(ids)
+	deleteIds := make([]string, len(ids))
 	for i, id := range ids {
-		f := map[string]interface{}{
-			"delete": map[string]interface{}{
-				"id": id.String(),
-			},
-		}
-		commit := (count == (i + 1))
-		_, err := conn.Update(f, commit)
-		if err != nil {
-			log.Print("Failed to delete doc with id:", id.String())
-			continue
-		}
+		deleteIds[i] = id.String()
+	}
+	
+	update := map[string]interface{}{
+		"delete" : deleteIds,
+	}
+	
+	commit := true
+	_, err := conn.Update(update, commit)
+	if err != nil {
+		log.Print("Failed to delete docs.")
+		return err
 	}
 
 	return nil
