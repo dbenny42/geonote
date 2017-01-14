@@ -61,14 +61,45 @@ func AddDoc(conn *solr.Connection, doc Document) error {
 	return nil
 }
 
-// func FindDocsNearby(recipient uuid.UUID, latitude float64, longitude float64) (Document, error) {
+func FindDocsNearby(
+	conn *solr.Connection,
+	recipient uuid.UUID,
+	latitude float64, 
+	longitude float64, 
+	radiusKm float64,
+	maxRows int) ([]*Document, error) {
 
-// }
+	geofilter := formatGeofilter(latitude, longitude, radiusKm)
+	
+	q := solr.Query{
+		Params: solr.URLParamMap{
+			"q": []string{"*:*"},
+			"fq": []string{
+				RECIPIENT + ":" + recipient.String(),
+				"!" + DELETED + ":" + "true",
+				geofilter,
+			},
+		},
+		Rows: maxRows,
+	}
+
+	response, err := conn.Select(&q)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+
+	results := response.Results
+	return docsFromResults(results), nil
+}
 
 func GetDoc(conn *solr.Connection, id uuid.UUID) (*Document, error) {
 	q := solr.Query{
 		Params: solr.URLParamMap{
-			"q":           []string{"id:" + id.String()},
+			"q": []string{ID + ":" + id.String()},
+			"fq": []string{
+				ID + ":" + id.String(),
+			},
 		},
 		Rows: 1,
 	}
@@ -94,7 +125,7 @@ func GetDoc(conn *solr.Connection, id uuid.UUID) (*Document, error) {
 		return nil, errors.New(message)
 	}
 		
-	return &docs[0], nil
+	return docs[0], nil
 }
 
 func DeleteDocs(conn *solr.Connection, ids []uuid.UUID) error {
@@ -117,7 +148,22 @@ func DeleteDocs(conn *solr.Connection, ids []uuid.UUID) error {
 	return nil
 }
 
-func docsFromResults(results *solr.DocumentCollection) []Document {
+func DeleteAll(conn *solr.Connection) error {
+	update := map[string]interface{}{
+		"delete" : "*",
+	}
+	
+	commit := true
+	_, err := conn.Update(update, commit)
+	if err != nil {
+		log.Print("Failed to delete docs.")
+		return err
+	}
+
+	return nil
+}
+
+func docsFromResults(results *solr.DocumentCollection) []*Document {
 	var err error
 	docs := make([]Document, results.Len())
 	for i := 0; i < results.Len(); i++ {
@@ -158,7 +204,7 @@ func docsFromResults(results *solr.DocumentCollection) []Document {
 		docs[i].deleted = currDoc.Field(DELETED).(bool)
 	}
 
-	return docs
+	return docPointers(docs)
 }
 
 func getCoordinateString(doc Document) string {
@@ -186,4 +232,22 @@ func coordinatesFromString(s string) (float64, float64, error) {
 	}
 	
 	return lat, lon, nil
+}
+
+func formatGeofilter(lat float64, lon float64, radiusKm float64) string {
+	latStr := formatCoordinateFloat(lat)
+	lonStr := formatCoordinateFloat(lon)
+	radiusStr := formatCoordinateFloat(radiusKm)
+	geofilter := 
+		"{!geofilt sfield=" + LOCATION + " pt=" + latStr + "," + lonStr + " d=" + radiusStr + "}"
+	log.Print("The geofilter is: ", geofilter)
+	return geofilter
+}
+
+func docPointers(docs []Document) []*Document {
+	dps := make([]*Document, len(docs))
+	for i, _ := range docs {
+		dps[i] = &docs[i]
+	}
+	return dps
 }
