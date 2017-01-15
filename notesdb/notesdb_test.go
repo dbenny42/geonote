@@ -154,7 +154,7 @@ func TestGetNotesById(t *testing.T) {
 		t.Fatal()
 	}
 
-	numNotes := 10000
+	numNotes := 10
 	notes := getTestNotes(numNotes, uuid.NewV4(), uuid.NewV4())
 	for _, note := range notes {
 		if err = InsertNote(db, note); err != nil {
