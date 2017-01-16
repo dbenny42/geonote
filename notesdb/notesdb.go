@@ -10,7 +10,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type DbNoteWriter interface {
+type NotesdbConnection interface {
 	InsertNote(note *Note) error
 	DeleteNote(id uuid.UUID) error
 	MarkNoteRead(id uuid.UUID) error

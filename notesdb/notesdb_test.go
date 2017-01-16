@@ -178,7 +178,7 @@ func TestGetNotesById(t *testing.T) {
 	}
 }
 
-func deleteNotes(db DbNoteWriter, notes []*Note) error {
+func deleteNotes(db NotesdbConnection, notes []*Note) error {
 	for _, note := range notes {
 		if err := db.DeleteNote(note.id); err != nil {
 			return err

@@ -11,6 +11,22 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+type SolrConnection interface {
+	AddDoc(doc Document) error
+	FindDocsNearby(
+		recipient uuid.UUID,
+		latitude float64, 
+		longitude float64, 
+		radiusKm float64,
+		maxRows int) ([]*Document, error)
+	GetDoc(id uuid.UUID) (*Document, error)
+	DeleteDocs(ids []uuid.UUID) error
+}
+
+type SolrNoteConnection struct {
+	conn *solr.Connection
+}
+
 type Document struct {
 	id uuid.UUID
 	sender uuid.UUID
@@ -34,7 +50,15 @@ const  (
 	ISO8601_LAYOUT = time.RFC3339
 )
 
-func AddDoc(conn *solr.Connection, doc Document) error {
+func NewSolrNoteConnection() (*SolrNoteConnection, error) {
+	conn, err := solr.Init("localhost", 8983, "geonotes")
+	if err != nil {
+		return nil, err
+	}
+	return &SolrNoteConnection{conn}, nil
+}
+
+func (sc SolrNoteConnection) AddDoc(doc Document) error {
 	update := map[string]interface{}{
 		"add": []interface{}{
 			map[string]interface{}{
@@ -50,7 +74,7 @@ func AddDoc(conn *solr.Connection, doc Document) error {
 	}
 
 	commit := true
-	_, err := conn.Update(update, commit)
+	_, err := sc.conn.Update(update, commit)
 
 	if err != nil {
 		log.Printf("Failed to add doc to solr. Id: %v, Error: %#v", 
@@ -61,8 +85,7 @@ func AddDoc(conn *solr.Connection, doc Document) error {
 	return nil
 }
 
-func FindDocsNearby(
-	conn *solr.Connection,
+func (sc SolrNoteConnection) FindDocsNearby(
 	recipient uuid.UUID,
 	latitude float64, 
 	longitude float64, 
@@ -83,7 +106,7 @@ func FindDocsNearby(
 		Rows: maxRows,
 	}
 
-	response, err := conn.Select(&q)
+	response, err := sc.conn.Select(&q)
 	if err != nil {
 		log.Print(err)
 		return nil, err
@@ -93,7 +116,7 @@ func FindDocsNearby(
 	return docsFromResults(results), nil
 }
 
-func GetDoc(conn *solr.Connection, id uuid.UUID) (*Document, error) {
+func (sc SolrNoteConnection) GetDoc(id uuid.UUID) (*Document, error) {
 	q := solr.Query{
 		Params: solr.URLParamMap{
 			"q": []string{ID + ":" + id.String()},
@@ -104,7 +127,7 @@ func GetDoc(conn *solr.Connection, id uuid.UUID) (*Document, error) {
 		Rows: 1,
 	}
 
-	response, err := conn.Select(&q)
+	response, err := sc.conn.Select(&q)
 	if err != nil {
 		log.Print(err)
 		return nil, err
@@ -128,7 +151,7 @@ func GetDoc(conn *solr.Connection, id uuid.UUID) (*Document, error) {
 	return docs[0], nil
 }
 
-func DeleteDocs(conn *solr.Connection, ids []uuid.UUID) error {
+func (sc SolrNoteConnection) DeleteDocs(ids []uuid.UUID) error {
 	deleteIds := make([]string, len(ids))
 	for i, id := range ids {
 		deleteIds[i] = id.String()
@@ -139,7 +162,7 @@ func DeleteDocs(conn *solr.Connection, ids []uuid.UUID) error {
 	}
 	
 	commit := true
-	_, err := conn.Update(update, commit)
+	_, err := sc.conn.Update(update, commit)
 	if err != nil {
 		log.Print("Failed to delete docs.")
 		return err

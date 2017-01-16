@@ -6,23 +6,22 @@ import (
 	"sort"
 
 	"github.com/satori/go.uuid"
-	"github.com/rtt/Go-Solr"
 )
 
 func TestAddDoc(t *testing.T) {
-	conn, err := solr.Init("localhost", 8983, "geonotes")
+	conn, err := NewSolrNoteConnection()
 	if err != nil {
 		t.Fatal()
 	}
 	
 	doc := getTestDoc(uuid.NewV4(), uuid.NewV4())
-	err = AddDoc(conn, doc)
+	err = conn.AddDoc(doc)
 	if err != nil {
 		t.Fatal("Add doc failed.")
 	}
-	defer DeleteDocs(conn, []uuid.UUID{doc.id})
+	defer conn.DeleteDocs([]uuid.UUID{doc.id})
 
-	result, err := GetDoc(conn, doc.id)
+	result, err := conn.GetDoc(doc.id)
 	if err != nil {
 		t.Fatal("Get doc failed.")
 	}
@@ -33,7 +32,7 @@ func TestAddDoc(t *testing.T) {
 }
 
 func TestFindDocsNearby(t *testing.T) {
-	conn, err := solr.Init("localhost", 8983, "geonotes")
+	conn, err := NewSolrNoteConnection()
 	if err != nil {
 		t.Fatal("Failed to connect to solr. Err: %v", err)
 	}
@@ -45,19 +44,19 @@ func TestFindDocsNearby(t *testing.T) {
 	farAway1 := getTestDocAtLocation(sender, recipient, 40.758320, -73.988327)
 	docs := []Document{nearby1, nearby2, farAway1}
 	for _, doc := range docs {
-		err := AddDoc(conn, doc)
+		err := conn.AddDoc(doc)
 		if err != nil {
 			t.Fatal("Failed to add doc. Err: %v", err)
 		}
 	}
 
-	defer DeleteDocs(conn, []uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
+	defer conn.DeleteDocs([]uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
 
 	searchLat := 40.809322
 	searchLon := -73.944587
 	searchRadiusKm := .5
 	maxRows := 10
-	results, err := FindDocsNearby(conn, recipient, searchLat, searchLon, searchRadiusKm, maxRows)
+	results, err := conn.FindDocsNearby(recipient, searchLat, searchLon, searchRadiusKm, maxRows)
 	if err != nil {
 		t.Fatal("Error from FindDocsNearby: ", err)
 	}
@@ -69,7 +68,7 @@ func TestFindDocsNearby(t *testing.T) {
 }
 
 func TestFindDocsIgnoresDeleted(t *testing.T) {
-	conn, err := solr.Init("localhost", 8983, "geonotes")
+	conn, err := NewSolrNoteConnection()
 	if err != nil {
 		t.Fatal("Failed to connect to solr. Err: %v", err)
 	}
@@ -82,19 +81,19 @@ func TestFindDocsIgnoresDeleted(t *testing.T) {
 	farAway1 := getTestDocAtLocation(sender, recipient, 40.758320, -73.988327)
 	docs := []Document{nearby1, nearby2, farAway1}
 	for _, doc := range docs {
-		err := AddDoc(conn, doc)
+		err := conn.AddDoc(doc)
 		if err != nil {
 			t.Fatal("Failed to add doc. Err: %v", err)
 		}
 	}
 
-	defer DeleteDocs(conn, []uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
+	defer conn.DeleteDocs([]uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
 
 	searchLat := 40.809322
 	searchLon := -73.944587
 	searchRadiusKm := .5
 	maxRows := 10
-	results, err := FindDocsNearby(conn, recipient, searchLat, searchLon, searchRadiusKm, maxRows)
+	results, err := conn.FindDocsNearby(recipient, searchLat, searchLon, searchRadiusKm, maxRows)
 	if err != nil {
 		t.Fatal("Error from FindDocsNearby: ", err)
 	}
