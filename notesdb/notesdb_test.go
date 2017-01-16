@@ -6,7 +6,6 @@ import (
 	"time"
 	"sort"
 	"io/ioutil"
-	"database/sql"
 
 	"github.com/go-yaml/yaml"
 	"github.com/satori/go.uuid"
@@ -22,16 +21,16 @@ func TestInsertNote(t *testing.T) {
 	sender := uuid.NewV4()
 	recipient := uuid.NewV4()
 
-	db, err := OpenDb(credentials)
+	db, err := NewMysqlNotesdb(credentials)
 	if err != nil {
 		t.Fatal()
 	}
 
 	note := getTestNote(sender, recipient)
-	if err = InsertNote(db, note); err != nil {
+	if err = db.InsertNote(note); err != nil {
 		t.Fatal()
 	}
-	defer DeleteNote(db, note.id)
+	defer db.DeleteNote(note.id)
 }
 
 func TestMarkNoteRead(t *testing.T) {
@@ -44,18 +43,18 @@ func TestMarkNoteRead(t *testing.T) {
 	sender := uuid.NewV4()
 	recipient := uuid.NewV4()
 	
-	db, err := OpenDb(credentials)
+	db, err := NewMysqlNotesdb(credentials)
 	if err != nil {
 		t.Fatal()
 	}
 
 	note := getTestNote(sender, recipient)
-	if err = InsertNote(db, note); err != nil {
+	if err = db.InsertNote(note); err != nil {
 		t.Fatal()
 	}
-	defer DeleteNote(db, note.id)
+	defer db.DeleteNote(note.id)
 
-	if err = MarkNoteRead(db, note.id); err != nil {
+	if err = db.MarkNoteRead(note.id); err != nil {
 		t.Fatal()
 	}
 }
@@ -67,7 +66,7 @@ func TestGetNotesBySender(t *testing.T) {
 		t.Fatal()
 	}
 
-	db, err := OpenDb(credentials)
+	db, err := NewMysqlNotesdb(credentials)
 	if err != nil {
 		t.Fatal()
 	}
@@ -79,19 +78,19 @@ func TestGetNotesBySender(t *testing.T) {
 	notes2 := getTestNotes(numNotes, sender2, uuid.NewV4())
 
 	for _, note := range notes {
-		if err = InsertNote(db, note); err != nil {
+		if err = db.InsertNote(note); err != nil {
 			t.Fatal()
 		}
 	}
 
 	for _, note := range notes2 {
-		if err = InsertNote(db, note); err != nil {
+		if err = db.InsertNote(note); err != nil {
 			t.Fatal()
 		}
 	}
 	defer deleteNotes(db, append(notes, notes2...))
 
-	resultNotes, err := GetNotesBySender(db, sender)
+	resultNotes, err := db.GetNotesBySender(sender)
 	if err != nil {
 		t.Fatal()
 	}
@@ -108,7 +107,7 @@ func TestGetNotesByRecipient(t *testing.T) {
 		t.Fatal()
 	}
 
-	db, err := OpenDb(credentials)
+	db, err := NewMysqlNotesdb(credentials)
 	if err != nil {
 		t.Fatal()
 	}
@@ -120,19 +119,19 @@ func TestGetNotesByRecipient(t *testing.T) {
 	notes2 := getTestNotes(numNotes, uuid.NewV4(), recipient2)
 
 	for _, note := range notes {
-		if err = InsertNote(db, note); err != nil {
+		if err = db.InsertNote(note); err != nil {
 			t.Fatal()
 		}
 	}
 
 	for _, note := range notes2 {
-		if err = InsertNote(db, note); err != nil {
+		if err = db.InsertNote(note); err != nil {
 			t.Fatal()
 		}
 	}
 	defer deleteNotes(db, append(notes, notes2...))
 
-	resultNotes, err := GetNotesByRecipient(db, recipient)
+	resultNotes, err := db.GetNotesByRecipient(recipient)
 	if err != nil {
 		t.Fatal()
 	}
@@ -149,7 +148,7 @@ func TestGetNotesById(t *testing.T) {
 		t.Fatal()
 	}
 
-	db, err := OpenDb(credentials)
+	db, err := NewMysqlNotesdb(credentials)
 	if err != nil {
 		t.Fatal()
 	}
@@ -157,7 +156,7 @@ func TestGetNotesById(t *testing.T) {
 	numNotes := 10
 	notes := getTestNotes(numNotes, uuid.NewV4(), uuid.NewV4())
 	for _, note := range notes {
-		if err = InsertNote(db, note); err != nil {
+		if err = db.InsertNote(note); err != nil {
 			t.Fatal()
 		}
 	}
@@ -169,7 +168,7 @@ func TestGetNotesById(t *testing.T) {
 		idsToFetch = append(idsToFetch, note.id)
 	}
 
-	resultNotes, err := GetNotesByIds(db, idsToFetch)
+	resultNotes, err := db.GetNotesByIds(idsToFetch)
 	if err != nil {
 		t.Fatal()
 	}
@@ -179,9 +178,9 @@ func TestGetNotesById(t *testing.T) {
 	}
 }
 
-func deleteNotes(db *sql.DB, notes []*Note) error {
+func deleteNotes(db DbNoteWriter, notes []*Note) error {
 	for _, note := range notes {
-		if err := DeleteNote(db, note.id); err != nil {
+		if err := db.DeleteNote(note.id); err != nil {
 			return err
 		}
 	}

@@ -10,6 +10,19 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+type DbNoteWriter interface {
+	InsertNote(note *Note) error
+	DeleteNote(id uuid.UUID) error
+	MarkNoteRead(id uuid.UUID) error
+	GetNotesBySender(senderId uuid.UUID) ([]*Note, error)
+	GetNotesByRecipient(recipientId uuid.UUID) ([]*Note, error)
+	GetNotesByIds(ids []uuid.UUID) ([]*Note, error)
+}
+
+type MysqlNotesdb struct {
+	conn *sql.DB
+}
+
 type DbCredentials struct {
 	User string
 	Password string
@@ -29,8 +42,7 @@ type Note struct {
 	deleted bool
 }
 
-func OpenDb(credentials *DbCredentials) (*sql.DB, error) {
-	// TODO: add parseTime=true
+func NewMysqlNotesdb(credentials *DbCredentials) (*MysqlNotesdb, error) {
 	dsn := credentials.User + ":" + credentials.Password + "@tcp(" + 
 		credentials.Host + ":" + credentials.Port + ")/geonote?parseTime=true"
 	db, err := sql.Open("mysql", dsn)
@@ -38,15 +50,16 @@ func OpenDb(credentials *DbCredentials) (*sql.DB, error) {
 		log.Print("Failed to open db:", err)
 		return nil, err
 	}
-	return db, nil
+
+	return &MysqlNotesdb{conn: db}, nil
 }
 
-func InsertNote(db *sql.DB, note *Note) error {
+func (db MysqlNotesdb) InsertNote(note *Note) error {
 	insertSql := "INSERT INTO notes " + 
 		" (id, sender, recipient, note, latitude, longitude, timesent, isread, isdeleted) VALUES " +
 		" (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
-	statement, err := db.Prepare(insertSql)
+	statement, err := db.conn.Prepare(insertSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement %v. Err: %v", insertSql, err)
 		return err
@@ -72,9 +85,9 @@ func InsertNote(db *sql.DB, note *Note) error {
 	return nil
 }
 
-func DeleteNote(db *sql.DB, id uuid.UUID) error {
+func (db MysqlNotesdb) DeleteNote(id uuid.UUID) error {
 	deleteSql := "DELETE FROM notes where id = ?"
-	statement, err := db.Prepare(deleteSql)
+	statement, err := db.conn.Prepare(deleteSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement %v. Err: %v", deleteSql, err)
 		return err
@@ -102,9 +115,9 @@ func DeleteNote(db *sql.DB, id uuid.UUID) error {
 	return nil
 }
 
-func MarkNoteRead(db *sql.DB, id uuid.UUID) error {
+func (db MysqlNotesdb) MarkNoteRead(id uuid.UUID) error {
 	updateSql := "UPDATE notes SET isread = 1 where id = ?"
-	statement, err := db.Prepare(updateSql)
+	statement, err := db.conn.Prepare(updateSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement to mark note with id %v as read. Err: %v", id, err)
 			return err
@@ -132,13 +145,13 @@ func MarkNoteRead(db *sql.DB, id uuid.UUID) error {
 	return nil
 }
 
-func GetNotesBySender(db *sql.DB, senderId uuid.UUID) ([]*Note, error) {
+func (db MysqlNotesdb) GetNotesBySender(senderId uuid.UUID) ([]*Note, error) {
 	selectSql := "SELECT " +
 		"id, sender, recipient, note, latitude, longitude, " +
 		"timesent, isread, isdeleted " +
 		"FROM notes " +
 		"WHERE sender = ?"
-	statement, err := db.Prepare(selectSql)
+	statement, err := db.conn.Prepare(selectSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement to select notes from sender %v. Err: %v", 
 			senderId, err)
@@ -160,13 +173,13 @@ func GetNotesBySender(db *sql.DB, senderId uuid.UUID) ([]*Note, error) {
 	return notes, nil
 }
 
-func GetNotesByRecipient(db *sql.DB, recipientId uuid.UUID) ([]*Note, error) {
+func (db MysqlNotesdb) GetNotesByRecipient(recipientId uuid.UUID) ([]*Note, error) {
 	selectSql := "SELECT " +
 		"id, sender, recipient, note, latitude, longitude, " +
 		"timesent, isread, isdeleted " +
 		"FROM notes " +
 		"WHERE recipient = ?"
-	statement, err := db.Prepare(selectSql)
+	statement, err := db.conn.Prepare(selectSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement to select notes from recipient %v. Err: %v", 
 			recipientId, err)
@@ -188,10 +201,10 @@ func GetNotesByRecipient(db *sql.DB, recipientId uuid.UUID) ([]*Note, error) {
 	return notes, nil
 }
 
-func GetNotesByIds(db *sql.DB, ids []uuid.UUID) ([]*Note, error) {
+func (db MysqlNotesdb) GetNotesByIds(ids []uuid.UUID) ([]*Note, error) {
 	var notes []*Note
 	for _, id := range ids {
-		note, err := GetNoteById(db, id)
+		note, err := db.GetNoteById(id)
 		if err != nil {
 			log.Printf("Failed to get note for id %v. Err: %v", id, err.Error())
 			return nil, err
@@ -202,7 +215,7 @@ func GetNotesByIds(db *sql.DB, ids []uuid.UUID) ([]*Note, error) {
 	return notes, nil
 }
 
-func GetNoteById(db *sql.DB, id uuid.UUID) (*Note, error) {
+func (db MysqlNotesdb) GetNoteById(id uuid.UUID) (*Note, error) {
 	var note *Note
 
 	selectSql := "SELECT " +
@@ -211,7 +224,7 @@ func GetNoteById(db *sql.DB, id uuid.UUID) (*Note, error) {
 		"FROM notes " +
 		"WHERE id = ?"
 
-	statement, err := db.Prepare(selectSql)
+	statement, err := db.conn.Prepare(selectSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement to select notes by id. Err: %v", err)
 		return nil, err
