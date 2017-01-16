@@ -5,6 +5,7 @@ import (
 	"log"
 	"database/sql"
 	"errors"
+	"strconv"
 	
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/satori/go.uuid"
@@ -12,8 +13,9 @@ import (
 
 type NotesdbConnection interface {
 	InsertNote(note *Note) error
-	DeleteNote(id uuid.UUID) error
+	PurgeNote(id uuid.UUID) error
 	MarkNoteRead(id uuid.UUID) error
+	MarkNoteDeleted(id uuid.UUID) error
 	GetNotesBySender(senderId uuid.UUID) ([]*Note, error)
 	GetNotesByRecipient(recipientId uuid.UUID) ([]*Note, error)
 	GetNotesByIds(ids []uuid.UUID) ([]*Note, error)
@@ -85,7 +87,7 @@ func (db MysqlNotesdb) InsertNote(note *Note) error {
 	return nil
 }
 
-func (db MysqlNotesdb) DeleteNote(id uuid.UUID) error {
+func (db MysqlNotesdb) PurgeNote(id uuid.UUID) error {
 	deleteSql := "DELETE FROM notes where id = ?"
 	statement, err := db.conn.Prepare(deleteSql)
 	if err != nil {
@@ -137,6 +139,37 @@ func (db MysqlNotesdb) MarkNoteRead(id uuid.UUID) error {
 		}
 		if rowsAffected != 1 {
 			message := "Mark as read failed to update exactly one row. Actual: " + string(rowsAffected)
+			log.Print(message)
+			return errors.New(message)
+		}
+	}
+
+	return nil
+}
+
+func (db MysqlNotesdb) MarkNoteDeleted(id uuid.UUID) error {
+	updateSql := "UPDATE notes SET isdeleted = 1 where id = ?"
+	statement, err := db.conn.Prepare(updateSql)
+	if err != nil {
+		log.Printf("Failed to prepare statement to mark note with id %v as deleted. Err: %v", id, err)
+			return err
+	}
+	defer statement.Close()
+
+	result, err := statement.Exec(id.String())
+	if err != nil {
+		log.Printf("Update statement for note id %v failed with err: %v", id, err)
+		return err
+	}
+
+	if rowsAffected, err := result.RowsAffected(); err != nil || rowsAffected != 1 {
+		if err != nil {
+			log.Printf("Error getting rows affected: %v", err)
+			return err
+		}
+		if rowsAffected != 1 {
+			message := "Mark as deleted failed to update exactly one row. Actual: " + 
+				strconv.FormatInt(rowsAffected, 10)
 			log.Print(message)
 			return errors.New(message)
 		}

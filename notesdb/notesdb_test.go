@@ -30,7 +30,7 @@ func TestInsertNote(t *testing.T) {
 	if err = db.InsertNote(note); err != nil {
 		t.Fatal()
 	}
-	defer db.DeleteNote(note.id)
+	defer db.PurgeNote(note.id)
 }
 
 func TestMarkNoteRead(t *testing.T) {
@@ -52,10 +52,54 @@ func TestMarkNoteRead(t *testing.T) {
 	if err = db.InsertNote(note); err != nil {
 		t.Fatal()
 	}
-	defer db.DeleteNote(note.id)
+	defer db.PurgeNote(note.id)
 
 	if err = db.MarkNoteRead(note.id); err != nil {
 		t.Fatal()
+	}
+
+	resultNotes, err := db.GetNotesByIds([]uuid.UUID{note.id})
+	if err != nil || len(resultNotes) != 1 {
+		t.Fatal("Failed to fetch note with id:", note.id, ", err: ", err)
+	}
+
+	if !resultNotes[0].read {
+		t.Fatal("Failed to actually mark note read.")
+	}
+}
+
+func TestMarkNoteDeleted(t *testing.T) {
+	credentials, err := parseDbCredentials("testingCredentials.yaml")
+	if err != nil {
+		log.Print("Failed to parse db credentials. Err:", err)
+		t.Fatal()
+	}
+
+	sender := uuid.NewV4()
+	recipient := uuid.NewV4()
+	
+	db, err := NewMysqlNotesdb(credentials)
+	if err != nil {
+		t.Fatal()
+	}
+
+	note := getTestNote(sender, recipient)
+	if err = db.InsertNote(note); err != nil {
+		t.Fatal()
+	}
+	defer db.PurgeNote(note.id)
+
+	if err = db.MarkNoteDeleted(note.id); err != nil {
+		t.Fatal()
+	}
+
+	resultNotes, err := db.GetNotesByIds([]uuid.UUID{note.id})
+	if err != nil || len(resultNotes) != 1 {
+		t.Fatal("Failed to fetch note with id: ", note.id)
+	}
+
+	if !resultNotes[0].deleted {
+		t.Fatal("Failed to actually mark note deleted.")
 	}
 }
 
@@ -180,7 +224,7 @@ func TestGetNotesById(t *testing.T) {
 
 func deleteNotes(db NotesdbConnection, notes []*Note) error {
 	for _, note := range notes {
-		if err := db.DeleteNote(note.id); err != nil {
+		if err := db.PurgeNote(note.id); err != nil {
 			return err
 		}
 	}
@@ -291,7 +335,7 @@ func getTestNote(sender uuid.UUID, recipient uuid.UUID) *Note {
 		longitude: 24.4,
 		timeSent: time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC),
 		read: false,
-		deleted: true,
+		deleted: false,
 	}
 }
 
