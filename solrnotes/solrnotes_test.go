@@ -19,7 +19,7 @@ func TestAddDoc(t *testing.T) {
 	if err != nil {
 		t.Fatal("Add doc failed.")
 	}
-	defer conn.DeleteDocs([]uuid.UUID{doc.id})
+	defer conn.PurgeDocs([]uuid.UUID{doc.id})
 
 	result, err := conn.GetDoc(doc.id)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestFindDocsNearby(t *testing.T) {
 		}
 	}
 
-	defer conn.DeleteDocs([]uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
+	defer conn.PurgeDocs([]uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
 
 	searchLat := 40.809322
 	searchLon := -73.944587
@@ -87,7 +87,7 @@ func TestFindDocsIgnoresDeleted(t *testing.T) {
 		}
 	}
 
-	defer conn.DeleteDocs([]uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
+	defer conn.PurgeDocs([]uuid.UUID{nearby1.id, nearby2.id, farAway1.id})
 
 	searchLat := 40.809322
 	searchLon := -73.944587
@@ -101,6 +101,68 @@ func TestFindDocsIgnoresDeleted(t *testing.T) {
 	expectedResults := []*Document{&nearby2}
 	if !allDocsEqual(expectedResults, results) {
 		t.Fatal("Results are not what we expected.")
+	}
+}
+
+func TestMarkDocDeleted(t *testing.T) {
+	conn, err := NewSolrNoteConnection()
+	if err != nil {
+		t.Fatal("Failed to connect to solr. Err: %v", err)
+	}
+
+	sender := uuid.NewV4()
+	recipient := uuid.NewV4()
+	doc := getTestDoc(sender, recipient)
+
+	err = conn.AddDoc(doc)
+	if err != nil {
+		t.Fatal("Failed to add doc. Err: %v", err)
+	}
+	defer conn.PurgeDocs([]uuid.UUID{doc.id})
+
+	err = conn.MarkDocDeleted(doc.id)
+	if err != nil {
+		t.Fatal("Failed to mark doc deleted. Id:", doc.id, "Err:", err)
+	}
+
+	resultDoc, err := conn.GetDoc(doc.id)
+	if err != nil {
+		t.Fatal("Failed to find test doc with id:", doc.id, "Err:", err)
+	}
+
+	if !resultDoc.deleted {
+		t.Fatal("Apparently we didn't actually delete theh doc in question.")
+	}
+}
+
+func TestMarkDocRead(t *testing.T) {
+	conn, err := NewSolrNoteConnection()
+	if err != nil {
+		t.Fatal("Failed to connect to solr. Err: %v", err)
+	}
+
+	sender := uuid.NewV4()
+	recipient := uuid.NewV4()
+	doc := getTestDoc(sender, recipient)
+
+	err = conn.AddDoc(doc)
+	if err != nil {
+		t.Fatal("Failed to add doc. Err: %v", err)
+	}
+	defer conn.PurgeDocs([]uuid.UUID{doc.id})
+
+	err = conn.MarkDocRead(doc.id)
+	if err != nil {
+		t.Fatal("Failed to mark doc deleted. Id:", doc.id, "Err:", err)
+	}
+
+	resultDoc, err := conn.GetDoc(doc.id)
+	if err != nil {
+		t.Fatal("Failed to find test doc with id:", doc.id, "Err:", err)
+	}
+
+	if !resultDoc.read {
+		t.Fatal("Apparently we didn't actually delete theh doc in question.")
 	}
 }
 
@@ -123,7 +185,7 @@ func getTestDocAtLocation(
 		latitude: lat,
 		longitude: lon,
 		timeSent: time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC),
-		read: true,
+		read: false,
 		deleted: false,
 	}
 }

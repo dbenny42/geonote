@@ -20,7 +20,9 @@ type SolrConnection interface {
 		radiusKm float64,
 		maxRows int) ([]*Document, error)
 	GetDoc(id uuid.UUID) (*Document, error)
-	DeleteDocs(ids []uuid.UUID) error
+	PurgeDocs(ids []uuid.UUID) error
+	MarkDocDeleted(id uuid.UUID) error
+	MarkDocRead(id uuid.UUID) error
 }
 
 type SolrNoteConnection struct {
@@ -59,19 +61,7 @@ func NewSolrNoteConnection() (*SolrNoteConnection, error) {
 }
 
 func (sc SolrNoteConnection) AddDoc(doc Document) error {
-	update := map[string]interface{}{
-		"add": []interface{}{
-			map[string]interface{}{
-				ID: doc.id.String(),
-				SENDER: doc.sender.String(),
-				RECIPIENT: doc.recipient.String(),
-				LOCATION: getCoordinateString(doc),
-				TIMESENT: doc.timeSent.Format(ISO8601_LAYOUT),
-				READ: doc.read,
-				DELETED: doc.deleted,
-			},
-		},
-	}
+	update := getUpdateJson(&doc)
 
 	commit := true
 	_, err := sc.conn.Update(update, commit)
@@ -151,7 +141,7 @@ func (sc SolrNoteConnection) GetDoc(id uuid.UUID) (*Document, error) {
 	return docs[0], nil
 }
 
-func (sc SolrNoteConnection) DeleteDocs(ids []uuid.UUID) error {
+func (sc SolrNoteConnection) PurgeDocs(ids []uuid.UUID) error {
 	deleteIds := make([]string, len(ids))
 	for i, id := range ids {
 		deleteIds[i] = id.String()
@@ -165,6 +155,48 @@ func (sc SolrNoteConnection) DeleteDocs(ids []uuid.UUID) error {
 	_, err := sc.conn.Update(update, commit)
 	if err != nil {
 		log.Print("Failed to delete docs.")
+		return err
+	}
+
+	return nil
+}
+
+func (sc SolrNoteConnection) MarkDocDeleted(id uuid.UUID) error {
+	doc, err := sc.GetDoc(id)
+	if err != nil {
+		log.Println("Failed to get doc to mark deleted with id: ", id, " Err: ", err)
+	}
+
+	doc.deleted = true
+	update := getUpdateJson(doc)
+
+	commit := true
+	_, err = sc.conn.Update(update, commit)
+
+	if err != nil {
+		log.Printf("Failed to mark doc deleted in solr. Id: %v, Error: %#v", 
+			id.String(), err)
+		return err
+	}
+
+	return nil
+}
+
+func (sc SolrNoteConnection) MarkDocRead(id uuid.UUID) error {
+	doc, err := sc.GetDoc(id)
+	if err != nil {
+		log.Println("Failed to get doc to mark deleted with id: ", id, " Err: ", err)
+	}
+
+	doc.read = true
+	update := getUpdateJson(doc)
+
+	commit := true
+	_, err = sc.conn.Update(update, commit)
+
+	if err != nil {
+		log.Printf("Failed to mark doc deleted in solr. Id: %v, Error: %#v", 
+			id.String(), err)
 		return err
 	}
 
@@ -257,4 +289,20 @@ func docPointers(docs []Document) []*Document {
 		dps[i] = &docs[i]
 	}
 	return dps
+}
+
+func getUpdateJson(doc *Document) map[string]interface{} {
+	return map[string]interface{}{
+		"add": []interface{}{
+			map[string]interface{}{
+				ID: doc.id.String(),
+				SENDER: doc.sender.String(),
+				RECIPIENT: doc.recipient.String(),
+				LOCATION: getCoordinateString(*doc),
+				TIMESENT: doc.timeSent.Format(ISO8601_LAYOUT),
+				READ: doc.read,
+				DELETED: doc.deleted,
+			},
+		},
+	}
 }
