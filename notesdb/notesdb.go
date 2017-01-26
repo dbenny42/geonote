@@ -16,8 +16,8 @@ type NotesdbConnection interface {
 	PurgeNote(id uuid.UUID) error
 	MarkNoteRead(id uuid.UUID) error
 	MarkNoteDeleted(id uuid.UUID) error
-	GetNotesBySender(senderId uuid.UUID) ([]*Note, error)
-	GetNotesByRecipient(recipientId uuid.UUID) ([]*Note, error)
+	GetNotesBySender(senderId uuid.UUID, count int, offset int) ([]*Note, error)
+	GetNotesByRecipient(recipientId uuid.UUID, count int, offset int) ([]*Note, error)
 	GetNotesByIds(ids []uuid.UUID) ([]*Note, error)
 }
 
@@ -178,12 +178,17 @@ func (db MysqlNotesdb) MarkNoteDeleted(id uuid.UUID) error {
 	return nil
 }
 
-func (db MysqlNotesdb) GetNotesBySender(senderId uuid.UUID) ([]*Note, error) {
+func (db MysqlNotesdb) GetNotesBySender(
+	senderId uuid.UUID,
+	count int,
+	offset int) ([]*Note, error) {
 	selectSql := "SELECT " +
 		"id, sender, recipient, note, latitude, longitude, " +
 		"timesent, isread, isdeleted " +
 		"FROM notes " +
-		"WHERE sender = ?"
+		"WHERE sender = ? " +
+		"ORDER BY timesent DESC " +
+		"LIMIT ? OFFSET ?"
 	statement, err := db.conn.Prepare(selectSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement to select notes from sender %v. Err: %v", 
@@ -193,7 +198,7 @@ func (db MysqlNotesdb) GetNotesBySender(senderId uuid.UUID) ([]*Note, error) {
 	defer statement.Close()
 
 	var notes []*Note
-	rows, err := statement.Query(senderId.String())
+	rows, err := statement.Query(senderId.String(), count, offset)
 	defer rows.Close()
 	for rows.Next() {
 		note, err := noteFromRow(rows)
@@ -206,12 +211,17 @@ func (db MysqlNotesdb) GetNotesBySender(senderId uuid.UUID) ([]*Note, error) {
 	return notes, nil
 }
 
-func (db MysqlNotesdb) GetNotesByRecipient(recipientId uuid.UUID) ([]*Note, error) {
+func (db MysqlNotesdb) GetNotesByRecipient(
+	recipientId uuid.UUID,
+	count int,
+	offset int) ([]*Note, error) {
 	selectSql := "SELECT " +
 		"id, sender, recipient, note, latitude, longitude, " +
 		"timesent, isread, isdeleted " +
 		"FROM notes " +
-		"WHERE recipient = ?"
+		"WHERE recipient = ? " +
+		"ORDER BY timesent DESC " +
+		"LIMIT ? OFFSET ?"
 	statement, err := db.conn.Prepare(selectSql)
 	if err != nil {
 		log.Printf("Failed to prepare statement to select notes from recipient %v. Err: %v", 
@@ -221,7 +231,7 @@ func (db MysqlNotesdb) GetNotesByRecipient(recipientId uuid.UUID) ([]*Note, erro
 	defer statement.Close()
 
 	var notes []*Note
-	rows, err := statement.Query(recipientId.String())
+	rows, err := statement.Query(recipientId.String(), count, offset)
 	defer rows.Close()
 	for rows.Next() {
 		note, err := noteFromRow(rows)

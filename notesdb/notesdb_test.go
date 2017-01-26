@@ -134,13 +134,109 @@ func TestGetNotesBySender(t *testing.T) {
 	}
 	defer deleteNotes(db, append(notes, notes2...))
 
-	resultNotes, err := db.GetNotesBySender(sender)
+	maxCount := 10
+	offset := 0
+	resultNotes, err := db.GetNotesBySender(sender, maxCount, offset)
 	if err != nil {
 		t.Fatal()
 	}
 
 	if !allNotesAreEqual(notes, resultNotes) {
 		t.Fatal()
+	}
+}
+
+func TestPaginatedGetNotesBySender(t *testing.T) {
+	credentials, err := parseDbCredentials("testingCredentials.yaml")
+	if err != nil {
+		log.Print("Failed to parse db credentials. Err:", err)
+		t.Fatal()
+	}
+
+	db, err := NewMysqlNotesdb(credentials)
+	if err != nil {
+		t.Fatal()
+	}
+
+	numNotes := 5
+	sender := uuid.NewV4()
+	notes := getTestNotes(numNotes, sender, uuid.NewV4())
+
+	for idx, _ := range notes {
+		notes[idx].timeSent = notes[idx].timeSent.AddDate(-idx, 0, 0)
+		
+		if err = db.InsertNote(notes[idx]); err != nil {
+			t.Fatal()
+		}
+	}
+
+	defer deleteNotes(db, notes)
+
+	maxCount := 2
+	offset := 0
+
+	for offset < numNotes {
+		resultNotes, err := db.GetNotesBySender(sender, maxCount, offset)
+		if err != nil {
+			t.Fatal()
+		}
+
+		upperLimit := offset + maxCount
+		if upperLimit > numNotes {
+			upperLimit = numNotes
+		}
+		if !allNotesAreEqual(notes[offset:upperLimit], resultNotes) {
+			t.Fatal()
+		}
+
+		offset += maxCount
+	}
+}
+
+func TestPaginatedGetNotesByRecipient(t *testing.T) {
+	credentials, err := parseDbCredentials("testingCredentials.yaml")
+	if err != nil {
+		log.Print("Failed to parse db credentials. Err:", err)
+		t.Fatal()
+	}
+
+	db, err := NewMysqlNotesdb(credentials)
+	if err != nil {
+		t.Fatal()
+	}
+
+	numNotes := 5
+	recipient := uuid.NewV4()
+	notes := getTestNotes(numNotes, uuid.NewV4(), recipient)
+
+	for idx, _ := range notes {
+		notes[idx].timeSent = notes[idx].timeSent.AddDate(-idx, 0, 0)
+		
+		if err = db.InsertNote(notes[idx]); err != nil {
+			t.Fatal()
+		}
+	}
+
+	defer deleteNotes(db, notes)
+
+	maxCount := 2
+	offset := 0
+
+	for offset < numNotes {
+		resultNotes, err := db.GetNotesByRecipient(recipient, maxCount, offset)
+		if err != nil {
+			t.Fatal()
+		}
+
+		upperLimit := offset + maxCount
+		if upperLimit > numNotes {
+			upperLimit = numNotes
+		}
+		if !allNotesAreEqual(notes[offset:upperLimit], resultNotes) {
+			t.Fatal()
+		}
+
+		offset += maxCount
 	}
 }
 
@@ -175,7 +271,9 @@ func TestGetNotesByRecipient(t *testing.T) {
 	}
 	defer deleteNotes(db, append(notes, notes2...))
 
-	resultNotes, err := db.GetNotesByRecipient(recipient)
+	maxCount := 10
+	offset := 0
+	resultNotes, err := db.GetNotesByRecipient(recipient, maxCount, offset)
 	if err != nil {
 		t.Fatal()
 	}
