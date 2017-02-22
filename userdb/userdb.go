@@ -1,7 +1,6 @@
 package userdb
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -119,21 +118,27 @@ func (db MysqlUserdb) CheckCredentials(username string, password string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	
-	possibleHash, err := getHash(password, userEntry.Salt)
-	if err != nil {
-		return false, err
+
+	if userEntry == nil {
+		return false, nil
 	}
-	
-	correctLogin := bytes.Equal(possibleHash, userEntry.Hash)
-	return correctLogin, nil
+
+	err = bcrypt.CompareHashAndPassword(userEntry.Hash, []byte(password + userEntry.Salt))
+	validLogin := (err == nil)
+	return validLogin, nil
 }
 
 func getHash(password string, salt string) ([]byte, error) {
-	passSalt := password + salt
-	return bcrypt.GenerateFromPassword([]byte(passSalt), bcrypt.DefaultCost)
+	passSalt := saltPassword(password, salt)
+	hash, err := bcrypt.GenerateFromPassword([]byte(passSalt), bcrypt.DefaultCost)
+	return hash, err
 }
 
+// getUserEntry returns a UserEntry object corresponding to the unique
+// username. If the username is not present in the database, *UserEntry is
+// nil, and error is also nil. It's not an error not to find the username
+// for which you're searching, but *UserEntry will also be nil. Therefore,
+// callers of this function should check error & *UserEntry for nil.
 func getUserEntry(db MysqlUserdb, username string) (*UserEntry, error) {
 	sql := "SELECT name, salt, hash from users where name = ?"
 	statement, err := db.conn.Prepare(sql)
@@ -158,7 +163,7 @@ func getUserEntry(db MysqlUserdb, username string) (*UserEntry, error) {
 		return entry, nil
 	}
 
-	return nil, errors.New(fmt.Sprintf("Failed to find any user entry with name %v", username))
+	return nil, nil
 }
 
 func userEntryFromRow(rows *sql.Rows) (*UserEntry, error) {
@@ -194,7 +199,6 @@ func createUserEntry(username string, password string) (*UserEntry, error) {
 
 	entry.Name = username
 	entry.Salt = generateSalt()
-
 	entry.Hash, err = getHash(password, entry.Salt)
 	if err != nil {
 		log.Fatal("Failed to hash password. Dying.")
@@ -202,4 +206,8 @@ func createUserEntry(username string, password string) (*UserEntry, error) {
 	}
 
 	return &entry, nil
+}
+
+func saltPassword(password string, salt string) string {
+	return password + salt
 }

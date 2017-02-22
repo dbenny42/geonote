@@ -35,56 +35,56 @@ func TestUserdb(t *testing.T) {
 		}
 	})
 
-	// t.Run("CheckCredentialsBadPassword", func(t *testing.T) {
-	// 	err = db.RegisterUser(username, password)
-	// 	if err != nil {
-	// 		t.Fatal("Failed to register new user.")
-	// 	}
-	// 	defer db.DeleteUser(username)
+	t.Run("CheckCredentialsBadPassword", func(t *testing.T) {
+		err = db.RegisterUser(username, password)
+		if err != nil {
+			t.Fatal("Failed to register new user.")
+		}
+		defer db.DeleteUser(username)
 
-	// 	validLogin, err := db.CheckCredentials(username, "badpassword")
-	// 	if err != nil {
-	// 		t.Fatal("Error while checking bad credentials.")
-	// 	}
+		validLogin, err := db.CheckCredentials(username, "badpassword")
+		if err != nil {
+			t.Fatal("Error while checking bad credentials.")
+		}
 
-	// 	if validLogin {
-	// 		t.Fatal("Userdb accepted a bad password as a valid login.")
-	// 	}
-	// })
+		if validLogin {
+			t.Fatal("Userdb accepted a bad password as a valid login.")
+		}
+	})
 
-	// t.Run("CheckCredentialsBadUsername", func() {
-	// 	err = db.RegisterUser(username, password)
-	// 	if err != nil {
-	// 		t.Fatal("Failed to register new user.")
-	// 	}
-	// 	defer db.DeleteUser(username)
+	t.Run("CheckCredentialsBadUsername", func(t *testing.T) {
+		err = db.RegisterUser(username, password)
+		if err != nil {
+			t.Fatal("Failed to register new user.")
+		}
+		defer db.DeleteUser(username)
 
-	// 	validLogin, err := db.CheckCredentials("badusername", password)
-	// 	if err != nil {
-	// 		t.Fatal("Error while checking bad credentials.")
-	// 	}
+		validLogin, err := db.CheckCredentials("badusername", password)
+		if err != nil {
+			t.Fatal("Error while checking bad credentials.")
+		}
 
-	// 	if validLogin {
-	// 		t.Fatal("Userdb accepted a bad username as a valid login.")
-	// 	}
-	// })
+		if validLogin {
+			t.Fatal("Userdb accepted a bad username as a valid login.")
+		}
+	})
 
-	// t.Run("CheckCredentialsSucceeds", func() {
-	// 	err = db.RegisterUser(username, password)
-	// 	if err != nil {
-	// 		t.Fatal("Failed to register new user.")
-	// 	}
-	// 	defer db.DeleteUser(username)
+	t.Run("CheckCredentialsSucceeds", func(t *testing.T) {
+		err = db.RegisterUser(username, password)
+		if err != nil {
+			t.Fatal("Failed to register new user.")
+		}
+		defer db.DeleteUser(username)
 
-	// 	validLogin, err := db.CheckCredentials(username, password)
-	// 	if err != nil {
-	// 		t.Fatal("Error while checking bad credentials.")
-	// 	}
+		validLogin, err := db.CheckCredentials(username, password)
+		if err != nil {
+			t.Fatal("Error while checking bad credentials.")
+		}
 
-	// 	if !validLogin {
-	// 		t.Fatal("Userdb did not accept a correct login..")
-	// 	}
-	// })
+		if !validLogin {
+			t.Fatal("Userdb did not accept a correct login.")
+		}
+	})
 }
 
 func parseDbCredentials(filename string) (*DbCredentials, error) {
